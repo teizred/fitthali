@@ -64,6 +64,37 @@ export function compressImage(file: File, max = 1280): Promise<{ data: string; p
   });
 }
 
+// ───────────── Illustrations Lyfta ─────────────
+// v2 : ignore les anciens résultats (recherche moins précise). Valeur = URL, ou "none:<timestamp>".
+const LYFTA_KEY = "fitthali:lyfta:v2";
+const RETRY_AFTER = 24 * 60 * 60 * 1000; // un « introuvable » est retenté au bout de 24 h
+function readLyfta(): Record<string, string> {
+  try {
+    return JSON.parse(localStorage.getItem(LYFTA_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+/** Illustrations Lyfta déjà trouvées (id d'exercice → URL), pour les miniatures. */
+export function lyftaCache(): Record<string, string> {
+  return Object.fromEntries(Object.entries(readLyfta()).filter(([, v]) => v.startsWith("http")));
+}
+
+/** URL de l'illustration Lyfta d'un exercice ("" = aucune). Mise en cache sur le téléphone. */
+export async function lyftaImage(exId: string, searchName: string): Promise<string> {
+  const hit = readLyfta()[exId];
+  if (hit?.startsWith("http")) return hit;
+  if (hit?.startsWith("none:") && Date.now() - Number(hit.slice(5)) < RETRY_AFTER) return "";
+  const { image } = await post<{ image: string | null }>("/api/lyfta", { name: searchName });
+  try {
+    localStorage.setItem(LYFTA_KEY, JSON.stringify({ ...readLyfta(), [exId]: image || `none:${Date.now()}` }));
+  } catch {
+    /* ignore */
+  }
+  return image || "";
+}
+
 // ───────────── Notifications ─────────────
 function b64ToUint8(b64: string) {
   const pad = "=".repeat((4 - (b64.length % 4)) % 4);

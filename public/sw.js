@@ -1,5 +1,7 @@
 // Service worker FitThali : cache hors-ligne minimal + notifications push
-const CACHE = "fitthali-v2";
+const CACHE = "fitthali-v3";
+// Photos d'exercices servies par jsDelivr : mises en cache pour marcher hors ligne à la salle.
+const CDN = "https://cdn.jsdelivr.net";
 self.addEventListener("install", (e) => {
   self.skipWaiting();
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(["/", "/manifest.webmanifest", "/icon.svg"])));
@@ -14,7 +16,25 @@ self.addEventListener("activate", (e) =>
 );
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
-  if (e.request.method !== "GET" || url.origin !== self.location.origin || url.pathname.startsWith("/api")) return;
+  if (e.request.method !== "GET" || url.pathname.startsWith("/api")) return;
+  if (url.origin === CDN) {
+    // Cache d'abord : ces photos ne changent jamais (version figée).
+    e.respondWith(
+      caches.match(e.request).then(
+        (hit) =>
+          hit ||
+          fetch(e.request).then((res) => {
+            if (res.ok) {
+              const copy = res.clone();
+              caches.open(CACHE).then((c) => c.put(e.request, copy));
+            }
+            return res;
+          })
+      )
+    );
+    return;
+  }
+  if (url.origin !== self.location.origin) return;
   e.respondWith(
     fetch(e.request)
       .then((res) => {

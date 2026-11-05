@@ -87,6 +87,7 @@ h3 { margin: 6px 0; }
 .sheet-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 14px 16px 6px; }
 .sheet-head select { width: auto; }
 .tab-body { padding: 8px 16px 24px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 8px; }
+.tab-body > * { flex-shrink: 0; }
 .seg { display: flex; gap: 4px; background: var(--card); border-radius: 12px; padding: 4px; margin: 0 16px; }
 .page .seg { margin: 0; }
 .seg button { flex: 1; border: 0; background: none; padding: 8px 4px; font-size: 13px; color: var(--muted); }
@@ -134,3 +135,28 @@ textarea { resize: vertical; }
 .rest-content button { padding: 8px 10px; }
 .rest-bar.done button { color: #05150b; border-color: rgba(0,0,0,.3); background: transparent; }
 .splash { min-height: 100dvh; display: grid; place-items: center; font-size: 28px; font-weight: 700; color: var(--accent); }
+
+/* Démo d'exercice : alterne 2 photos (début / fin du mouvement) */
+.demo { position: relative; aspect-ratio: 3 / 2; border-radius: 12px; overflow: hidden; background: #000; margin: 4px 0 10px; }
+.demo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.demo img + img { animation: demo-flip 1.6s steps(1, end) infinite; }
+@keyframes demo-flip { 0% { opacity: 0; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .demo img + img { animation: none; opacity: 0; } }
+.thumb { width: 56px; height: 38px; flex-shrink: 0; border-radius: 6px; object-fit: cover; background: var(--line); }
+.ex-row { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+/* Illustration Lyfta : fond blanc (PNG détouré) */
+.lyfta { background: #fff; border-radius: 12px; display: flex; justify-content: center; align-items: center; min-height: 180px; padding: 8px; }
+.lyfta img { max-width: 100%; max-height: 300px; object-fit: contain; }
+.lyfta.loading { background: var(--card); animation: lyfta-pulse 1.2s ease-in-out infinite; }
+@keyframes lyfta-pulse { 50% { opacity: .5; } }
+
+/* Catégories musculaires avec icône */
+.muscle-tabs { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; margin: 0 -4px; padding: 2px 4px 4px; }
+.muscle-tabs::-webkit-scrollbar { display: none; }
+.muscle-tabs button { flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; width: 68px; padding: 8px 2px 6px; border: 1px solid transparent; border-radius: 12px; background: none; color: var(--muted); font-size: 11.5px; }
+.muscle-tabs button.on { background: var(--card); border-color: var(--accent); color: var(--text); }
+.muscle-icon { width: 34px; height: 51px; }
+.mi-body { fill: #4a4f5a; }
+.mi-on { fill: #e2553f; }
+.mi-pulse { fill: none; stroke: #fff; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.thumb-lyfta { background: #fff; object-fit: contain; padding: 2px; }

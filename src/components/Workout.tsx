@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { EQUIPMENT, EXERCISES, MUSCLES, type Exercise } from "@/data/exercises";
+import { EQUIPMENT, EXERCISES, MUSCLES, demoImages, type Exercise } from "@/data/exercises";
+import { ExerciseThumb, ExerciseVisual, ExerciseVisualById } from "./ExerciseDemo";
+import { MuscleIcon } from "./MuscleIcon";
 import { normalize } from "@/data/foods";
 import { r0, uid, useStore, type Workout as W, type WorkoutExercise } from "@/lib/store";
 import { unlockAudio, useRestTimer } from "./RestTimer";
@@ -19,6 +21,7 @@ function volume(w: W) {
 export function Workout() {
   const { s, set } = useStore();
   const [view, setView] = useState<W | null>(null);
+  const [browsing, setBrowsing] = useState(false);
 
   const startWorkout = (from?: W) => {
     unlockAudio();
@@ -39,6 +42,8 @@ export function Workout() {
   return (
     <div className="page">
       <button className="primary block big" onClick={() => startWorkout()}>▶ Démarrer une séance</button>
+      <button className="ghost block" onClick={() => setBrowsing(true)}>📚 Voir les exercices</button>
+      {browsing && <ExercisePicker onClose={() => setBrowsing(false)} />}
       <h3>Historique</h3>
       {s.workouts.length === 0 && <div className="muted">Aucune séance pour l'instant.</div>}
       {[...s.workouts].sort((a, b) => b.start - a.start).map((w) => (
@@ -84,6 +89,14 @@ function ActiveWorkout() {
   const w = s.active!;
   const [picking, setPicking] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+  const [demos, setDemos] = useState<Set<string>>(() => new Set());
+  const toggleDemo = (exId: string) =>
+    setDemos((d) => {
+      const n = new Set(d);
+      if (n.has(exId)) n.delete(exId);
+      else n.add(exId);
+      return n;
+    });
   const { start } = useRestTimer();
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
@@ -137,8 +150,14 @@ function ActiveWorkout() {
           <div className="card" key={i}>
             <div className="card-head">
               <b>{ex.name}</b>
-              <button className="ghost small" onClick={() => update((x) => ({ ...x, exercises: x.exercises.filter((_, j) => j !== i) }))}>✕</button>
+              <div className="row gap">
+                {demoImages(ex.exId) && (
+                  <button className="ghost small" onClick={() => toggleDemo(ex.exId)}>{demos.has(ex.exId) ? "Masquer" : "▶ Démo"}</button>
+                )}
+                <button className="ghost small" onClick={() => update((x) => ({ ...x, exercises: x.exercises.filter((_, j) => j !== i) }))}>✕</button>
+              </div>
             </div>
+            {demos.has(ex.exId) && <ExerciseVisualById exId={ex.exId} name={ex.name} />}
             <div className="row gap small">
               <span className="muted">Repos</span>
               <select value={ex.rest} onChange={(e) => updateEx(i, (x) => ({ ...x, rest: Number(e.target.value) }))}>
@@ -186,11 +205,13 @@ function ActiveWorkout() {
   );
 }
 
-function ExercisePicker({ onPick, onClose }: { onPick: (e: Exercise) => void; onClose: () => void }) {
+/** Liste des exercices. Avec `onPick` : choix pour la séance ; sans : simple bibliothèque à consulter. */
+function ExercisePicker({ onPick, onClose }: { onPick?: (e: Exercise) => void; onClose: () => void }) {
   const { s, set } = useStore();
   const [q, setQ] = useState("");
   const [muscle, setMuscle] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [info, setInfo] = useState<Exercise | null>(null);
   const [form, setForm] = useState({ muscle: MUSCLES[0], equip: "Machine" });
   const all = useMemo(() => [...s.customExercises, ...EXERCISES], [s.customExercises]);
   const list = all.filter((e) => (!muscle || e.muscle === muscle) && (!q || normalize(e.name + e.equip).includes(normalize(q))));
@@ -198,37 +219,87 @@ function ExercisePicker({ onPick, onClose }: { onPick: (e: Exercise) => void; on
   const create = () => {
     const ex: Exercise = { id: "cx-" + uid(), name: q.trim(), muscle: form.muscle, equip: form.equip, custom: true };
     set((st) => ({ ...st, customExercises: [ex, ...st.customExercises] }));
-    onPick(ex);
+    setCreating(false);
+    if (onPick) onPick(ex);
+    else setInfo(ex);
   };
 
   return (
     <div className="sheet-backdrop" onClick={onClose}>
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
-        <div className="sheet-head"><b>Exercices</b><button className="ghost" onClick={onClose}>Fermer</button></div>
-        <div className="tab-body">
-          <input autoFocus className="search" placeholder="Rechercher ou nommer une machine…" value={q} onChange={(e) => setQ(e.target.value)} />
-          <div className="chips">
-            {MUSCLES.map((m) => <button key={m} className={"chip" + (muscle === m ? " on" : "")} onClick={() => setMuscle(muscle === m ? null : m)}>{m}</button>)}
-          </div>
-          {q.trim() && !creating && <button className="add block" onClick={() => setCreating(true)}>＋ Créer « {q.trim()} »</button>}
-          {creating && (
-            <div className="card">
-              <div className="grid2">
-                <label className="field">Muscle<select value={form.muscle} onChange={(e) => setForm({ ...form, muscle: e.target.value })}>{MUSCLES.map((m) => <option key={m}>{m}</option>)}</select></label>
-                <label className="field">Matériel<select value={form.equip} onChange={(e) => setForm({ ...form, equip: e.target.value })}>{EQUIPMENT.map((m) => <option key={m}>{m}</option>)}</select></label>
-              </div>
-              <button className="primary block" onClick={create}>Créer et ajouter</button>
-            </div>
-          )}
-          <ul className="list">
-            {list.map((e) => (
-              <li key={e.id} onClick={() => onPick(e)}>
-                <span>{e.name}</span>
-                <span className="muted small">{e.muscle} · {e.equip}</span>
-              </li>
-            ))}
-          </ul>
+        <div className="sheet-head">
+          {info ? <button className="ghost" onClick={() => setInfo(null)}>← Retour</button> : <b>{onPick ? "Ajouter un exercice" : "Exercices"}</b>}
+          <button className="ghost" onClick={onClose}>Fermer</button>
         </div>
+        {info ? (
+          <ExerciseInfo ex={info} onAdd={onPick && (() => onPick(info))} />
+        ) : (
+          <div className="tab-body">
+            <input autoFocus={!!onPick} className="search" placeholder="Rechercher ou nommer une machine…" value={q} onChange={(e) => setQ(e.target.value)} />
+            <div className="muscle-tabs">
+              {MUSCLES.map((m) => (
+                <button key={m} className={muscle === m ? "on" : ""} onClick={() => setMuscle(muscle === m ? null : m)}>
+                  <MuscleIcon muscle={m} />
+                  <span>{m}</span>
+                </button>
+              ))}
+            </div>
+            {q.trim() && !creating && <button className="add block" onClick={() => setCreating(true)}>＋ Créer « {q.trim()} »</button>}
+            {creating && (
+              <div className="card">
+                <div className="grid2">
+                  <label className="field">Muscle<select value={form.muscle} onChange={(e) => setForm({ ...form, muscle: e.target.value })}>{MUSCLES.map((m) => <option key={m}>{m}</option>)}</select></label>
+                  <label className="field">Matériel<select value={form.equip} onChange={(e) => setForm({ ...form, equip: e.target.value })}>{EQUIPMENT.map((m) => <option key={m}>{m}</option>)}</select></label>
+                </div>
+                <button className="primary block" onClick={create}>{onPick ? "Créer et ajouter" : "Créer"}</button>
+              </div>
+            )}
+            <ul className="list">
+              {list.map((e) => (
+                <li key={e.id} onClick={() => setInfo(e)}>
+                  <div className="ex-row"><ExerciseThumb exId={e.id} /><span>{e.name}</span></div>
+                  <span className="muted small">{e.muscle} · {e.equip}</span>
+                </li>
+              ))}
+              {list.length === 0 && <li className="muted">Aucun exercice. Tape un nom pour le créer.</li>}
+            </ul>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Fiche d'un exercice : démo, record et historique. */
+function ExerciseInfo({ ex, onAdd }: { ex: Exercise; onAdd?: () => void }) {
+  const { s } = useStore();
+  const history = useMemo(
+    () =>
+      [...s.workouts]
+        .sort((a, b) => b.start - a.start)
+        .flatMap((w) => w.exercises.filter((e) => e.exId === ex.id).map((e) => ({ date: w.start, sets: e.sets.filter((x) => x.done) })))
+        .filter((h) => h.sets.length),
+    [s.workouts, ex.id],
+  );
+  const best = history.flatMap((h) => h.sets).reduce<{ kg: number; reps: number } | null>((a, x) => (!a || x.kg > a.kg || (x.kg === a.kg && x.reps > a.reps) ? x : a), null);
+
+  return (
+    <div className="tab-body">
+      <h3>{ex.name}</h3>
+      <div className="muted small">{ex.muscle} · {ex.equip}</div>
+      <ExerciseVisual ex={ex} />
+      {onAdd && <button className="primary block" onClick={onAdd}>＋ Ajouter à la séance</button>}
+      <div className="card">
+        <div className="card-head"><b>Ton historique</b>{best && <span className="small">Record : {best.kg} kg × {best.reps}</span>}</div>
+        {history.length === 0 && <div className="muted small">Pas encore fait.</div>}
+        <ul className="list compact">
+          {history.slice(0, 8).map((h, i) => (
+            <li key={i}>
+              <span className="muted small">{new Date(h.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}</span>
+              <span className="small">{h.sets.map((x) => `${x.kg}×${x.reps}`).join(" · ")}</span>
+            </li>
+          ))}
+        </ul>
       </div>
     </div>
   );
